@@ -1,7 +1,6 @@
 let shaderNames = ["grid_0", "glowing_petals"];
 
 async function main() {
-  let shaderSelect = document.querySelector("select")!;
   let canvas = document.querySelector("canvas")!;
   let gl = canvas.getContext("webgl");
 
@@ -10,6 +9,8 @@ async function main() {
   }
 
   let scaleFactor = 4;
+  let currentShaderIndex = 0;
+  let framesPerShader = 0;
 
   let positions = Float32Array.of(
     ...[...[-1, 1], ...[-1, -1], ...[1, 1]],
@@ -31,7 +32,7 @@ async function main() {
 
   let vs = compileShader(gl, gl.VERTEX_SHADER, vsSource);
 
-  let shaderMap = new Map<string, WebGLProgram>();
+  let programs: WebGLProgram[] = [];
 
   for (let name of shaderNames) {
     let fsSource = await fetchShader(name);
@@ -42,27 +43,18 @@ async function main() {
     gl.enableVertexAttribArray(positionAttrib);
     gl.vertexAttribPointer(positionAttrib, 2, gl.FLOAT, false, 0, 0);
 
-    shaderMap.set(name, program);
-  }
-
-  for (let name of shaderMap.keys()) {
-    let option = document.createElement("option");
-    option.label = name;
-    option.value = name;
-    shaderSelect.appendChild(option);
+    programs.push(program);
   }
 
   let resolutionUniform: WebGLUniformLocation | null = null;
   let timeUniform: WebGLUniformLocation | null = null;
 
-  shaderSelect.addEventListener("change", () => {
-    switchShader(gl!, shaderSelect.value);
-  });
-
   window.addEventListener("resize", () => resize(gl!));
 
   window.requestAnimationFrame(function loop() {
+    if (framesPerShader === 0) cycleShaders(gl!);
     draw(gl!);
+    framesPerShader = (framesPerShader + 1) % 12;
     window.requestAnimationFrame(loop);
   });
 
@@ -73,12 +65,12 @@ async function main() {
     resize(gl!);
   });
 
-  switchShader(gl, shaderSelect.value);
+  cycleShaders(gl);
 
   let startTime = Date.now();
 
-  function switchShader(gl: WebGLRenderingContext, name: string) {
-    let program = shaderMap.get(name)!;
+  function cycleShaders(gl: WebGLRenderingContext) {
+    let program = programs[currentShaderIndex];
 
     resolutionUniform = gl.getUniformLocation(program, "u_resolution");
     timeUniform = gl.getUniformLocation(program, "u_time");
@@ -86,6 +78,8 @@ async function main() {
     gl.useProgram(program);
 
     resize(gl);
+
+    currentShaderIndex = (currentShaderIndex + 1) % programs.length;
   }
 
   function resize(gl: WebGLRenderingContext) {

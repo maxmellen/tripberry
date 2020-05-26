@@ -1,12 +1,13 @@
 let shaderNames = ["grid_0", "glowing_petals"];
 async function main() {
-    let shaderSelect = document.querySelector("select");
     let canvas = document.querySelector("canvas");
     let gl = canvas.getContext("webgl");
     if (!gl) {
         throw new Error("This browser does not support WebGL.");
     }
     let scaleFactor = 4;
+    let currentShaderIndex = 0;
+    let framesPerShader = 0;
     let positions = Float32Array.of(...[...[-1, 1], ...[-1, -1], ...[1, 1]], ...[...[1, 1], ...[-1, -1], ...[1, -1]]);
     let positionBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
@@ -20,7 +21,7 @@ async function main() {
   }
   `;
     let vs = compileShader(gl, gl.VERTEX_SHADER, vsSource);
-    let shaderMap = new Map();
+    let programs = [];
     for (let name of shaderNames) {
         let fsSource = await fetchShader(name);
         let fs = compileShader(gl, gl.FRAGMENT_SHADER, fsSource);
@@ -28,22 +29,16 @@ async function main() {
         let positionAttrib = gl.getAttribLocation(program, "a_position");
         gl.enableVertexAttribArray(positionAttrib);
         gl.vertexAttribPointer(positionAttrib, 2, gl.FLOAT, false, 0, 0);
-        shaderMap.set(name, program);
-    }
-    for (let name of shaderMap.keys()) {
-        let option = document.createElement("option");
-        option.label = name;
-        option.value = name;
-        shaderSelect.appendChild(option);
+        programs.push(program);
     }
     let resolutionUniform = null;
     let timeUniform = null;
-    shaderSelect.addEventListener("change", () => {
-        switchShader(gl, shaderSelect.value);
-    });
     window.addEventListener("resize", () => resize(gl));
     window.requestAnimationFrame(function loop() {
+        if (framesPerShader === 0)
+            cycleShaders(gl);
         draw(gl);
+        framesPerShader = (framesPerShader + 1) % 12;
         window.requestAnimationFrame(loop);
     });
     window.addEventListener("keydown", (event) => {
@@ -53,14 +48,15 @@ async function main() {
         scaleFactor = Math.pow(2, numberKey - 1);
         resize(gl);
     });
-    switchShader(gl, shaderSelect.value);
+    cycleShaders(gl);
     let startTime = Date.now();
-    function switchShader(gl, name) {
-        let program = shaderMap.get(name);
+    function cycleShaders(gl) {
+        let program = programs[currentShaderIndex];
         resolutionUniform = gl.getUniformLocation(program, "u_resolution");
         timeUniform = gl.getUniformLocation(program, "u_time");
         gl.useProgram(program);
         resize(gl);
+        currentShaderIndex = (currentShaderIndex + 1) % programs.length;
     }
     function resize(gl) {
         gl.canvas.width = canvas.clientWidth / scaleFactor;
