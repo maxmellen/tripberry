@@ -3,7 +3,7 @@
 let canvas = document.querySelector("canvas");
 let gl = canvas.getContext("webgl");
 if (!gl) {
-    throw new Error("This browser does not support WebGL 2.");
+    throw new Error("This browser does not support WebGL.");
 }
 let scaleFactor = 1;
 let positions = Float32Array.of(...[...[-1, 1], ...[-1, -1], ...[1, 1]], ...[...[1, 1], ...[-1, -1], ...[1, -1]]);
