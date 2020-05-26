@@ -1,10 +1,19 @@
+let shaderNames = ["grid_0", "glowing_petals"];
 async function main() {
+    let shaderSelect = document.querySelector("select");
     let canvas = document.querySelector("canvas");
     let gl = canvas.getContext("webgl");
     if (!gl) {
         throw new Error("This browser does not support WebGL.");
     }
-    let scaleFactor = 1;
+    let shaders = new Map(await Promise.all(shaderNames.map(async (name) => [name, await fetchShader(name)])));
+    for (let name of shaders.keys()) {
+        let option = document.createElement("option");
+        option.label = name;
+        option.value = name;
+        shaderSelect.appendChild(option);
+    }
+    let scaleFactor = 4;
     let positions = Float32Array.of(...[...[-1, 1], ...[-1, -1], ...[1, 1]], ...[...[1, 1], ...[-1, -1], ...[1, -1]]);
     // language=GLSL
     let vsSource = `#version 100
@@ -14,19 +23,12 @@ async function main() {
       gl_Position = vec4(a_position, 0.0, 1.0);
   }
   `;
-    let fsSource = await fetchShader("glowing_petals");
     let vs = compileShader(gl, gl.VERTEX_SHADER, vsSource);
-    let fs = compileShader(gl, gl.FRAGMENT_SHADER, fsSource);
-    let program = linkProgram(gl, vs, fs);
-    let positionBuffer = gl.createBuffer();
-    let positionAttrib = gl.getAttribLocation(program, "a_position");
-    let resolutionUniform = gl.getUniformLocation(program, "u_resolution");
-    let timeUniform = gl.getUniformLocation(program, "u_time");
-    gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, positions, gl.STATIC_DRAW);
-    gl.enableVertexAttribArray(positionAttrib);
-    gl.vertexAttribPointer(positionAttrib, 2, gl.FLOAT, false, 0, 0);
-    gl.useProgram(program);
+    let resolutionUniform = null;
+    let timeUniform = null;
+    shaderSelect.addEventListener("change", () => {
+        switchShader(gl, shaderSelect.value);
+    });
     window.addEventListener("resize", () => resize(gl));
     window.requestAnimationFrame(function loop() {
         draw(gl);
@@ -39,8 +41,23 @@ async function main() {
         scaleFactor = Math.pow(2, numberKey - 1);
         resize(gl);
     });
-    resize(gl);
+    switchShader(gl, shaderSelect.value);
     let startTime = Date.now();
+    function switchShader(gl, name) {
+        let fsSource = shaders.get(name);
+        let fs = compileShader(gl, gl.FRAGMENT_SHADER, fsSource);
+        let program = linkProgram(gl, vs, fs);
+        let positionBuffer = gl.createBuffer();
+        let positionAttrib = gl.getAttribLocation(program, "a_position");
+        resolutionUniform = gl.getUniformLocation(program, "u_resolution");
+        timeUniform = gl.getUniformLocation(program, "u_time");
+        gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, positions, gl.STATIC_DRAW);
+        gl.enableVertexAttribArray(positionAttrib);
+        gl.vertexAttribPointer(positionAttrib, 2, gl.FLOAT, false, 0, 0);
+        gl.useProgram(program);
+        resize(gl);
+    }
     function resize(gl) {
         gl.canvas.width = canvas.clientWidth / scaleFactor;
         gl.canvas.height = canvas.clientHeight / scaleFactor;
