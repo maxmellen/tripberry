@@ -9,27 +9,16 @@ async function main() {
     throw new Error("This browser does not support WebGL.");
   }
 
-  let shaders = new Map<string, string>(
-    await Promise.all(
-      shaderNames.map(
-        async (name) => [name, await fetchShader(name)] as [string, string]
-      )
-    )
-  );
-
-  for (let name of shaders.keys()) {
-    let option = document.createElement("option");
-    option.label = name;
-    option.value = name;
-    shaderSelect.appendChild(option);
-  }
-
   let scaleFactor = 4;
 
   let positions = Float32Array.of(
     ...[...[-1, 1], ...[-1, -1], ...[1, 1]],
     ...[...[1, 1], ...[-1, -1], ...[1, -1]]
   );
+
+  let positionBuffer = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+  gl.bufferData(gl.ARRAY_BUFFER, positions, gl.STATIC_DRAW);
 
   // language=GLSL
   let vsSource = `#version 100
@@ -41,6 +30,28 @@ async function main() {
   `;
 
   let vs = compileShader(gl, gl.VERTEX_SHADER, vsSource);
+
+  let shaderMap = new Map<string, WebGLProgram>();
+
+  for (let name of shaderNames) {
+    let fsSource = await fetchShader(name);
+    let fs = compileShader(gl, gl.FRAGMENT_SHADER, fsSource);
+    let program = linkProgram(gl, vs, fs);
+    let positionAttrib = gl.getAttribLocation(program, "a_position");
+
+    gl.enableVertexAttribArray(positionAttrib);
+    gl.vertexAttribPointer(positionAttrib, 2, gl.FLOAT, false, 0, 0);
+
+    shaderMap.set(name, program);
+  }
+
+  for (let name of shaderMap.keys()) {
+    let option = document.createElement("option");
+    option.label = name;
+    option.value = name;
+    shaderSelect.appendChild(option);
+  }
+
   let resolutionUniform: WebGLUniformLocation | null = null;
   let timeUniform: WebGLUniformLocation | null = null;
 
@@ -67,20 +78,10 @@ async function main() {
   let startTime = Date.now();
 
   function switchShader(gl: WebGLRenderingContext, name: string) {
-    let fsSource = shaders.get(name)!;
-    let fs = compileShader(gl, gl.FRAGMENT_SHADER, fsSource);
-    let program = linkProgram(gl, vs, fs);
+    let program = shaderMap.get(name)!;
 
-    let positionBuffer = gl.createBuffer();
-    let positionAttrib = gl.getAttribLocation(program, "a_position");
     resolutionUniform = gl.getUniformLocation(program, "u_resolution");
     timeUniform = gl.getUniformLocation(program, "u_time");
-
-    gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, positions, gl.STATIC_DRAW);
-
-    gl.enableVertexAttribArray(positionAttrib);
-    gl.vertexAttribPointer(positionAttrib, 2, gl.FLOAT, false, 0, 0);
 
     gl.useProgram(program);
 
