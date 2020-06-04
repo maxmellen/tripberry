@@ -11,6 +11,8 @@ async function main() {
   let scaleFactor = 4;
   let currentShaderIndex = 0;
   let framesPerShader = 0;
+  let lastFrameTime = Date.now();
+  let averageFrameRate = 35;
 
   let positions = Float32Array.of(
     ...[...[-1, 1], ...[-1, -1], ...[1, 1]],
@@ -52,9 +54,25 @@ async function main() {
   window.addEventListener("resize", () => resize(gl!));
 
   window.requestAnimationFrame(function loop() {
+    let currentTime = Date.now();
+    let frameTime = currentTime - lastFrameTime;
+    lastFrameTime = currentTime;
+    let currentFrameRate = 1000 / frameTime;
+    averageFrameRate =
+      (currentFrameRate - averageFrameRate) * (2 / 31) + averageFrameRate;
+
+    if (averageFrameRate < 30) {
+      console.log("factor up", { scaleFactor });
+      scaleFactor *= 2;
+      resize(gl!);
+    } else if (averageFrameRate >= 60) {
+      console.log("factor down", { scaleFactor });
+      scaleFactor /= 2;
+      resize(gl!);
+    }
     if (framesPerShader === 0) cycleShaders(gl!);
     draw(gl!);
-    framesPerShader = (framesPerShader + 1) % 12;
+    framesPerShader = (framesPerShader + 1) % 600;
     window.requestAnimationFrame(loop);
   });
 
