@@ -1,8 +1,8 @@
+import { names as shaderNames } from "./shaders.js";
+
 const INITIAL_AVERAGE_FRAME_RATE = 35;
 const INITIAL_SCALE_FACTOR = 512;
 const FRAME_RATE_RESET_INTERVAL = 5 * 60 * 1000;
-
-let shaderNames = ["grid_0", "glowing_petals"];
 
 type Entry = {
   name: string;
@@ -45,6 +45,12 @@ async function main() {
   let vs = compileShader(gl, gl.VERTEX_SHADER, vsSource);
 
   let entries: Entry[] = [];
+
+  window.addEventListener("keydown", (e) => {
+    if (e.key === "d") {
+      console.log({ entries });
+    }
+  });
 
   for (let name of shaderNames) {
     let fsSource = await fetchShader(name);
