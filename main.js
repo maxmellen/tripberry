@@ -60,12 +60,10 @@ async function main() {
         if (averageFrameRate < 30) {
             currentEntry.scaleFactor *= 2;
             currentEntry.tooDamnHigh = true;
-            averageFrameRate = 35;
             resize(gl);
         }
         else if (averageFrameRate >= 60 && !currentEntry.tooDamnHigh) {
             currentEntry.scaleFactor /= 2;
-            averageFrameRate = 35;
             resize(gl);
         }
         if (framesPerShader === 0)
@@ -88,8 +86,8 @@ async function main() {
         resolutionUniform = gl.getUniformLocation(program, "u_resolution");
         timeUniform = gl.getUniformLocation(program, "u_time");
         gl.useProgram(program);
-        resize(gl);
         currentShaderIndex = (currentShaderIndex + 1) % entries.length;
+        resize(gl);
     }
     function resize(gl) {
         let scaleFactor = entries[currentShaderIndex].scaleFactor;
@@ -97,6 +95,7 @@ async function main() {
         gl.canvas.height = canvas.clientHeight / scaleFactor;
         gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
         gl.uniform2f(resolutionUniform, gl.canvas.width, gl.canvas.height);
+        averageFrameRate = 35;
     }
     function draw(gl) {
         gl.clearColor(0, 0, 0, 0);
