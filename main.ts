@@ -1,3 +1,7 @@
+const INITIAL_AVERAGE_FRAME_RATE = 35;
+const INITIAL_SCALE_FACTOR = 512;
+const FRAME_RATE_RESET_INTERVAL = 5 * 60 * 1000;
+
 let shaderNames = ["grid_0", "glowing_petals"];
 
 type Entry = {
@@ -18,7 +22,7 @@ async function main() {
   let currentShaderIndex = 0;
   let framesPerShader = 0;
   let lastFrameTime = Date.now();
-  let averageFrameRate = 60;
+  let averageFrameRate = INITIAL_AVERAGE_FRAME_RATE;
 
   let positions = Float32Array.of(
     ...[...[-1, 1], ...[-1, -1], ...[1, 1]],
@@ -51,8 +55,20 @@ async function main() {
     gl.enableVertexAttribArray(positionAttrib);
     gl.vertexAttribPointer(positionAttrib, 2, gl.FLOAT, false, 0, 0);
 
-    entries.push({ name, program, scaleFactor: 512, tooDamnHigh: false });
+    entries.push({
+      name,
+      program,
+      scaleFactor: INITIAL_SCALE_FACTOR,
+      tooDamnHigh: false,
+    });
   }
+
+  setInterval(() => {
+    for (let entry of entries) {
+      entry.scaleFactor = INITIAL_SCALE_FACTOR;
+      entry.tooDamnHigh = false;
+    }
+  }, FRAME_RATE_RESET_INTERVAL);
 
   let resolutionUniform: WebGLUniformLocation | null = null;
   let timeUniform: WebGLUniformLocation | null = null;
