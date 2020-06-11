@@ -1,5 +1,12 @@
 let shaderNames = ["grid_0", "glowing_petals"];
 
+type Entry = {
+  name: string;
+  program: WebGLProgram;
+  scaleFactor: number;
+  tooDamnHigh: boolean;
+};
+
 async function main() {
   let canvas = document.querySelector("canvas")!;
   let gl = canvas.getContext("webgl");
@@ -8,11 +15,10 @@ async function main() {
     throw new Error("This browser does not support WebGL.");
   }
 
-  let scaleFactor = 4;
   let currentShaderIndex = 0;
   let framesPerShader = 0;
   let lastFrameTime = Date.now();
-  let averageFrameRate = 35;
+  let averageFrameRate = 60;
 
   let positions = Float32Array.of(
     ...[...[-1, 1], ...[-1, -1], ...[1, 1]],
@@ -34,7 +40,7 @@ async function main() {
 
   let vs = compileShader(gl, gl.VERTEX_SHADER, vsSource);
 
-  let programs: WebGLProgram[] = [];
+  let entries: Entry[] = [];
 
   for (let name of shaderNames) {
     let fsSource = await fetchShader(name);
@@ -45,7 +51,7 @@ async function main() {
     gl.enableVertexAttribArray(positionAttrib);
     gl.vertexAttribPointer(positionAttrib, 2, gl.FLOAT, false, 0, 0);
 
-    programs.push(program);
+    entries.push({ name, program, scaleFactor: 512, tooDamnHigh: false });
   }
 
   let resolutionUniform: WebGLUniformLocation | null = null;
@@ -54,22 +60,25 @@ async function main() {
   window.addEventListener("resize", () => resize(gl!));
 
   window.requestAnimationFrame(function loop() {
+    let currentEntry = entries[currentShaderIndex];
     let currentTime = Date.now();
     let frameTime = currentTime - lastFrameTime;
     lastFrameTime = currentTime;
     let currentFrameRate = 1000 / frameTime;
     averageFrameRate =
-      (currentFrameRate - averageFrameRate) * (2 / 31) + averageFrameRate;
+      (currentFrameRate - averageFrameRate) * (2 / 11) + averageFrameRate;
 
     if (averageFrameRate < 30) {
-      console.log("factor up", { scaleFactor });
-      scaleFactor *= 2;
+      currentEntry.scaleFactor *= 2;
+      currentEntry.tooDamnHigh = true;
+      averageFrameRate = 35;
       resize(gl!);
-    } else if (averageFrameRate >= 60) {
-      console.log("factor down", { scaleFactor });
-      scaleFactor /= 2;
+    } else if (averageFrameRate >= 60 && !currentEntry.tooDamnHigh) {
+      currentEntry.scaleFactor /= 2;
+      averageFrameRate = 35;
       resize(gl!);
     }
+
     if (framesPerShader === 0) cycleShaders(gl!);
     draw(gl!);
     framesPerShader = (framesPerShader + 1) % 600;
@@ -79,7 +88,7 @@ async function main() {
   window.addEventListener("keydown", (event) => {
     let numberKey = +event.key;
     if (Number.isNaN(numberKey)) return;
-    scaleFactor = Math.pow(2, numberKey - 1);
+    entries[currentShaderIndex].scaleFactor = Math.pow(2, numberKey - 1);
     resize(gl!);
   });
 
@@ -88,7 +97,7 @@ async function main() {
   let startTime = Date.now();
 
   function cycleShaders(gl: WebGLRenderingContext) {
-    let program = programs[currentShaderIndex];
+    let program = entries[currentShaderIndex].program!;
 
     resolutionUniform = gl.getUniformLocation(program, "u_resolution");
     timeUniform = gl.getUniformLocation(program, "u_time");
@@ -97,10 +106,11 @@ async function main() {
 
     resize(gl);
 
-    currentShaderIndex = (currentShaderIndex + 1) % programs.length;
+    currentShaderIndex = (currentShaderIndex + 1) % entries.length;
   }
 
   function resize(gl: WebGLRenderingContext) {
+    let scaleFactor = entries[currentShaderIndex].scaleFactor;
     gl.canvas.width = canvas.clientWidth / scaleFactor;
     gl.canvas.height = canvas.clientHeight / scaleFactor;
     gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
