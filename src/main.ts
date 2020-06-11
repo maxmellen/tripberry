@@ -46,12 +46,6 @@ async function main() {
 
   let entries: Entry[] = [];
 
-  window.addEventListener("keydown", (e) => {
-    if (e.key === "d") {
-      console.log({ entries });
-    }
-  });
-
   for (let name of shaderNames) {
     let fsSource = await fetchShader(name);
     let fs = compileShader(gl, gl.FRAGMENT_SHADER, fsSource);
@@ -106,10 +100,19 @@ async function main() {
   });
 
   window.addEventListener("keydown", (event) => {
-    let numberKey = +event.key;
-    if (Number.isNaN(numberKey)) return;
-    entries[currentShaderIndex].scaleFactor = Math.pow(2, numberKey - 1);
-    resize(gl!);
+    switch (event.key) {
+      case "d":
+        console.log({ entries });
+        break;
+      case " ":
+        cycleShaders(gl!);
+        break;
+      default:
+        let numberKey = parseInt(event.key);
+        if (Number.isNaN(numberKey)) return;
+        entries[currentShaderIndex].scaleFactor = Math.pow(2, numberKey - 1);
+        resize(gl!);
+    }
   });
 
   cycleShaders(gl);
