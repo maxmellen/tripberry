@@ -3,6 +3,7 @@ import { names as shaderNames } from "./shaders.js";
 const INITIAL_AVERAGE_FRAME_RATE = 35;
 const INITIAL_SCALE_FACTOR = 512;
 const FRAME_RATE_RESET_INTERVAL = 5 * 60 * 1000;
+const FFT_SIZE = 512;
 
 type Entry = {
   name: string;
@@ -11,9 +12,28 @@ type Entry = {
   tooDamnHigh: boolean;
 };
 
+let waveformData: Uint8Array | null;
+let frequencyData: Uint8Array | null;
+let audioTextureData: Uint8Array | null;
+
 async function main() {
   let canvas = document.querySelector("canvas")!;
   let gl = canvas.getContext("webgl");
+
+  let { mediaDevices } = navigator;
+
+  let inputStream = await mediaDevices.getUserMedia({ audio: true });
+  let audioCtx = new window.AudioContext();
+  let audioSource = audioCtx.createMediaStreamSource(inputStream);
+  let analyserNode = audioCtx.createAnalyser();
+
+  analyserNode.fftSize = FFT_SIZE;
+
+  frequencyData = new Uint8Array(analyserNode.frequencyBinCount);
+  waveformData = new Uint8Array(analyserNode.frequencyBinCount);
+  audioTextureData = new Uint8Array(analyserNode.frequencyBinCount * 2);
+
+  audioSource.connect(analyserNode);
 
   if (!gl) {
     throw new Error("This browser does not support WebGL.");
@@ -30,8 +50,17 @@ async function main() {
   );
 
   let positionBuffer = gl.createBuffer();
+  let audioTexture = gl.createTexture();
+
   gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
   gl.bufferData(gl.ARRAY_BUFFER, positions, gl.STATIC_DRAW);
+
+  gl.bindTexture(gl.TEXTURE_2D, audioTexture);
+  gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
   // language=GLSL
   let vsSource = `#version 100
@@ -50,6 +79,7 @@ async function main() {
     let fsSource = await fetchShader(name);
     let fs = compileShader(gl, gl.FRAGMENT_SHADER, fsSource);
     let program = linkProgram(gl, vs, fs);
+
     let positionAttrib = gl.getAttribLocation(program, "a_position");
 
     gl.enableVertexAttribArray(positionAttrib);
@@ -72,6 +102,7 @@ async function main() {
 
   let resolutionUniform: WebGLUniformLocation | null = null;
   let timeUniform: WebGLUniformLocation | null = null;
+  let audioUniform: WebGLUniformLocation | null = null;
 
   window.addEventListener("resize", () => resize(gl!));
 
@@ -104,6 +135,13 @@ async function main() {
       case "d":
         console.log({ entries });
         break;
+      case "a":
+        console.log({
+          waveformData,
+          frequencyData,
+          audioTextureData,
+        });
+        break;
       case " ":
         cycleShaders(gl!);
         break;
@@ -124,6 +162,7 @@ async function main() {
 
     resolutionUniform = gl.getUniformLocation(program, "u_resolution");
     timeUniform = gl.getUniformLocation(program, "u_time");
+    audioUniform = gl.getUniformLocation(program, "u_audio");
 
     gl.useProgram(program);
 
@@ -144,6 +183,25 @@ async function main() {
     gl.clearColor(0, 0, 0, 0);
     gl.clear(gl.COLOR_BUFFER_BIT);
     gl.uniform1f(timeUniform, (Date.now() - startTime) / 1000);
+    gl.uniform1i(audioUniform, 0);
+
+    analyserNode.getByteFrequencyData(frequencyData!);
+    analyserNode.getByteTimeDomainData(waveformData!);
+    audioTextureData!.set(frequencyData!);
+    audioTextureData!.set(waveformData!, analyserNode.frequencyBinCount);
+
+    gl.texImage2D(
+      gl.TEXTURE_2D,
+      0,
+      gl.LUMINANCE,
+      frequencyData!.byteLength,
+      2,
+      0,
+      gl.LUMINANCE,
+      gl.UNSIGNED_BYTE,
+      audioTextureData
+    );
+
     gl.drawArrays(gl.TRIANGLES, 0, 6);
   }
 }
