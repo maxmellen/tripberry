@@ -2,7 +2,8 @@ import { names as shaderNames } from "./shaders.js";
 
 const INITIAL_AVERAGE_FRAME_RATE = 35;
 const INITIAL_SCALE_FACTOR = 512;
-const FRAME_RATE_RESET_INTERVAL = 5 * 60 * 1000;
+const FRAME_RATE_RESET_INTERVAL = 30 * 60 * 1000;
+const FRAMES_PER_SHADER = 60 * 2 * 60;
 const FFT_SIZE = 512;
 
 type Entry = {
@@ -40,7 +41,7 @@ async function main() {
   }
 
   let currentShaderIndex = 0;
-  let framesPerShader = 0;
+  let elapsedShaderFrames = 0;
   let lastFrameTime = Date.now();
   let averageFrameRate = INITIAL_AVERAGE_FRAME_RATE;
 
@@ -124,9 +125,9 @@ async function main() {
       resize(gl!);
     }
 
-    if (framesPerShader === 0) cycleShaders(gl!);
+    if (elapsedShaderFrames === 0) cycleShaders(gl!);
     draw(gl!);
-    framesPerShader = (framesPerShader + 1) % 600;
+    elapsedShaderFrames = (elapsedShaderFrames + 1) % FRAMES_PER_SHADER;
     window.requestAnimationFrame(loop);
   });
 
@@ -153,11 +154,12 @@ async function main() {
     }
   });
 
+  let startTime = 0;
+
   cycleShaders(gl);
 
-  let startTime = Date.now();
-
   function cycleShaders(gl: WebGLRenderingContext) {
+    startTime = Date.now();
     let program = entries[currentShaderIndex].program!;
 
     resolutionUniform = gl.getUniformLocation(program, "u_resolution");
@@ -166,7 +168,8 @@ async function main() {
 
     gl.useProgram(program);
 
-    currentShaderIndex = (currentShaderIndex + 1) % entries.length;
+    let randomOffset = Math.floor(Math.random() * entries.length);
+    currentShaderIndex = (currentShaderIndex + randomOffset) % entries.length;
     resize(gl);
   }
 
