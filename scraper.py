@@ -2,6 +2,7 @@ import requests
 from loguru import logger
 import os
 import re
+import pyperclip
 
 appKey = 'NtHtMn'
 
@@ -39,15 +40,28 @@ def crawlShader(url):
         return answer.json()
     else:
         print(f"Error fetching shader: {answer.text}")
+        return False
 
 
-def saveShader(shaderJson):
-    shaderInfo = shaderJson['Shader']['info']
-    shaderName = shaderInfo['name'].lower().replace(' ', "_")
-    shaderName = re.sub('[^0-9a-zA-Z\-:_]', "", shaderName)
+def saveShader(shaderJson, url):
+    if not shaderJson:
+        print('gimme manual biatch\n')
+        shaderName = input('NAME:\n')
+        input('Please copy code to clipboard and press enter.\n')#
+        code = pyperclip.paste()
+        id = url.split('/')[-1]
+        username = 'unknown'
 
-    code = prefix.format(shaderInfo['username'], shaderInfo['id']) + \
-           shaderJson['Shader']['renderpass'][0]['code'] + \
+    else:
+        shaderInfo = shaderJson['Shader']['info']
+        shaderName = shaderInfo['name'].lower().replace(' ', "_")
+        shaderName = re.sub('[^0-9a-zA-Z\-:_]', "", shaderName)
+        code = shaderJson['Shader']['renderpass'][0]['code']
+        username = shaderInfo['username']
+        id = shaderInfo['id']
+
+    code = prefix.format(username, id) + \
+           code + \
            suffix
 
     with open(f'shaders/{shaderName}.frag', 'w') as file:
@@ -71,7 +85,7 @@ def updateShaderList():
 @logger.catch
 def workShader(url):
     shaderJson = crawlShader(url)
-    shaderName = saveShader(shaderJson)
+    shaderName = saveShader(shaderJson, url)
     updateShaderList()
 
     print(f"Shader {shaderName} added.\n\n")
