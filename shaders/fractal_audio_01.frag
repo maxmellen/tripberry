@@ -10,7 +10,7 @@ uniform sampler2D u_audio;
 
 #define iResolution u_resolution
 #define iTime u_time
-#define iMouse vec2(0.0, 0.0)
+#define iMouse vec4(0.0)
 #define iChannel0 u_audio
 #define texture texture2D
 const int iters = 150;
