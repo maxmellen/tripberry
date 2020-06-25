@@ -95,3 +95,12 @@ if __name__ == "__main__":
     while True:
         url = input("Shadertoy link to add:\n")
         workShader(url)
+
+
+folder = "shaders"
+for filename in os.listdir(folder):
+    if filename.endswith('.frag'):
+        if '\n' in filename:
+            complete_path = f"{folder}/{filename}"
+            os.rename(complete_path, complete_path.replace('\n', ''))
+            print(complete_path.replace('\n', ''))
